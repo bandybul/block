@@ -1,0 +1,441 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>🎮 벽돌깨기 게임</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  font-family: 'Noto Sans KR', 'Apple SD Gothic Neo', sans-serif;
+  background: #0f0f1a;
+  color: #e0e0e0;
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+#app { width: 100%; max-width: 560px; padding: 20px; }
+
+/* ── 이름 입력 ── */
+#nameScreen {
+  display: flex; flex-direction: column; align-items: center;
+  gap: 18px; padding: 28px 20px;
+}
+#nameScreen h1 { font-size: 30px; font-weight: 700; color: #B5D4F4; }
+#nameScreen > p { font-size: 15px; color: #888; text-align: center; line-height: 1.7; }
+
+.guide-box {
+  background: #12182e; border: 1px solid #2a3a5a; border-radius: 12px;
+  padding: 14px 18px; width: 100%; max-width: 400px;
+}
+.guide-box h3 { font-size: 14px; color: #6699cc; margin-bottom: 10px; font-weight: 600; }
+.guide-box table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.guide-box td { padding: 4px 6px; color: #bbb; }
+.guide-box td:first-child { color: #888; width: 120px; }
+.dot { display: inline-block; width: 11px; height: 11px; border-radius: 2px; margin-right: 5px; vertical-align: middle; }
+
+#nameInput {
+  font-size: 22px; padding: 13px 24px;
+  border: 2px solid #378ADD; border-radius: 12px;
+  width: 280px; background: #1a1a2e; color: #e0e0e0;
+  text-align: center; outline: none;
+}
+#nameInput:focus { border-color: #B5D4F4; }
+#startBtn {
+  font-size: 22px; padding: 13px 48px; border-radius: 12px;
+  background: #185FA5; color: #fff; border: none;
+  cursor: pointer; font-weight: 700; transition: background 0.2s;
+}
+#startBtn:hover { background: #0C447C; }
+
+/* ── 게임 화면 ── */
+#gameScreen { display: none; flex-direction: column; align-items: center; gap: 10px; }
+#hud {
+  display: flex; justify-content: space-between; align-items: center;
+  width: 100%; max-width: 520px;
+  font-size: 16px; color: #B5D4F4; padding: 0 4px; font-weight: 500;
+}
+#hudLevel {
+  background: #185FA5; color: #fff; font-size: 13px; font-weight: 700;
+  padding: 3px 12px; border-radius: 20px;
+}
+#canvas {
+  border: 2px solid #378ADD; border-radius: 6px;
+  display: block; background: #1a1a2e;
+  touch-action: none; max-width: 100%;
+}
+#controls { font-size: 13px; color: #444; text-align: center; }
+
+/* ── 레벨업 오버레이 ── */
+#levelUpOverlay {
+  display: none; position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+  background: rgba(10,10,30,0.88);
+  flex-direction: column; align-items: center; justify-content: center;
+  gap: 14px; border-radius: 6px; z-index: 10;
+}
+#levelUpOverlay h2 { font-size: 34px; font-weight: 700; color: #f1c40f; }
+#levelUpOverlay p  { font-size: 20px; color: #B5D4F4; }
+#levelUpOverlay small { font-size: 15px; color: #888; }
+#canvasWrap { position: relative; max-width: 520px; width: 100%; }
+
+/* ── 결과 화면 ── */
+#resultScreen {
+  display: none; flex-direction: column; align-items: center;
+  gap: 16px; padding: 20px 0;
+}
+#resultTitle { font-size: 26px; font-weight: 700; color: #B5D4F4; }
+#resultMsg { font-size: 18px; color: #aaa; text-align: center; white-space: pre-line; line-height: 1.8; }
+#rankMsg   { font-size: 21px; font-weight: 700; color: #f1c40f; }
+#leaderboard {
+  width: 100%; max-width: 480px;
+  border: 1px solid #2a3a5a; border-radius: 12px;
+  overflow: hidden; background: #1a1a2e;
+}
+#leaderboard table { width: 100%; border-collapse: collapse; }
+#leaderboard th {
+  background: #12182e; padding: 11px 16px;
+  font-size: 13px; font-weight: 600; color: #6699cc; text-align: left;
+}
+#leaderboard td { padding: 11px 16px; font-size: 15px; color: #ccc; border-top: 1px solid #1e2a44; }
+.highlight-row td { background: #0c2a4a; color: #B5D4F4; font-weight: 700; }
+#playAgainBtn {
+  font-size: 20px; padding: 13px 40px; border-radius: 12px;
+  background: #185FA5; color: #fff; border: none;
+  cursor: pointer; font-weight: 700; transition: background 0.2s;
+}
+#playAgainBtn:hover { background: #0C447C; }
+
+@media (max-width: 540px) {
+  #canvas { width: 100% !important; height: auto !important; }
+}
+</style>
+</head>
+<body>
+<div id="app">
+
+  <!-- 이름 입력 화면 -->
+  <div id="nameScreen">
+    <h1>🎮 벽돌깨기 게임</h1>
+    <p>이름을 입력하고 게임을 시작하세요!</p>
+
+    <div class="guide-box">
+      <h3>📊 점수 기준 (벽돌 1개당)</h3>
+      <table>
+        <tr>
+          <td style="white-space:nowrap"><span class="dot" style="background:#e74c3c"></span>빨강 (1줄) <b style="color:#fff">50점</b></td>
+          <td style="white-space:nowrap"><span class="dot" style="background:#e67e22"></span>주황 (2줄) <b style="color:#fff">40점</b></td>
+        </tr>
+        <tr>
+          <td style="white-space:nowrap"><span class="dot" style="background:#f1c40f"></span>노랑 (3줄) <b style="color:#fff">30점</b></td>
+          <td style="white-space:nowrap"><span class="dot" style="background:#2ecc71"></span>초록 (4줄) <b style="color:#fff">20점</b></td>
+        </tr>
+        <tr>
+          <td style="white-space:nowrap"><span class="dot" style="background:#3498db"></span>파랑 (5줄) <b style="color:#fff">10점</b></td>
+          <td style="white-space:nowrap"><span class="dot" style="background:#9b59b6"></span>보라·청록 <b style="color:#fff">10점</b></td>
+        </tr>
+        <tr>
+          <td colspan="2">🏆 레벨 클리어 보너스 <b style="color:#f1c40f">레벨×100점</b></td>
+        </tr>
+      </table>
+    </div>
+
+    <div class="guide-box" style="text-align:center; padding: 4px 20px;">
+      <p style="font-size:15px; margin-bottom:6px;">⚠️ 건강 주의사항</p>
+      <table style="width:100%; border-collapse:collapse; font-size:13px;">
+        <tr><td style="padding:2px 4px; color:#888; width:4px;">😵</td><td style="padding:2px 4px; color:#bbb;">30분 이상 : 눈이 팽팽해집니다</td></tr>
+        <tr><td style="padding:2px 4px; color:#888;">🪨</td><td style="padding:2px 4px; color:#bbb;">1시간 이상 : 어깨가 돌이 됩니다</td></tr>
+        <tr><td style="padding:2px 4px; color:#888;">🏥</td><td style="padding:2px 4px; color:#bbb; white-space:nowrap">클리어 : 병원비가 점수보다 더 많이 나옵니다 😅</td></tr>
+      </table>
+    </div>
+
+    <input id="nameInput" type="text" placeholder="이름 입력" maxlength="12" />
+    <button id="startBtn" onclick="startGame()">게임 시작</button>
+  </div>
+
+  <!-- 게임 화면 -->
+  <div id="gameScreen">
+    <div id="hud">
+      <span id="hudName"></span>
+      <span id="hudLevel">레벨 1</span>
+      <span id="hudScore">점수: 0</span>
+      <span id="hudLives">❤️❤️❤️</span>
+    </div>
+    <div id="canvasWrap">
+      <canvas id="canvas" width="520" height="440"></canvas>
+      <div id="levelUpOverlay">
+        <h2 id="loTitle">🎉 레벨 클리어!</h2>
+        <p id="loMsg">보너스 +100점</p>
+        <small>잠시 후 다음 레벨로...</small>
+      </div>
+    </div>
+    <div id="controls">마우스를 좌우로 움직이거나, 모바일에서는 터치로 패들을 조종하세요</div>
+  </div>
+
+  <!-- 결과 화면 -->
+  <div id="resultScreen">
+    <div id="resultTitle">게임 종료!</div>
+    <div id="resultMsg"></div>
+    <div id="rankMsg"></div>
+    <div id="leaderboard">
+      <table>
+        <thead><tr><th>순위</th><th>이름</th><th>점수</th><th>레벨</th></tr></thead>
+        <tbody id="lbBody"></tbody>
+      </table>
+    </div>
+    <button id="playAgainBtn" onclick="resetToName()">다시 하기</button>
+  </div>
+
+</div>
+<script>
+const canvas = document.getElementById('canvas');
+const ctx = canvas.getContext('2d');
+const W = 520, H = 440;
+const PADDLE_W = 110, PADDLE_H = 18, PADDLE_Y = H - 36;
+const BALL_R = 10;
+const BRICK_W = 52, BRICK_H = 26, BRICK_PAD = 6;
+const BRICK_COLS = 8;
+const BRICK_OFFSET_X = 16, BRICK_OFFSET_Y = 52;
+const BRICK_COLORS = ['#e74c3c','#e67e22','#f1c40f','#2ecc71','#3498db','#9b59b6','#1abc9c'];
+
+const LEVEL_CONFIG = [
+  null,
+  { speed: 3.0, rows: 5 },
+  { speed: 3.5, rows: 6 },
+  { speed: 4.0, rows: 6 },
+  { speed: 4.6, rows: 7 },
+  { speed: 5.2, rows: 7 },
+];
+
+let playerName = '', score = 0, lives = 3, level = 1, animId = null;
+let paddleX = W/2 - PADDLE_W/2;
+let ball = { x: W/2, y: H/2, dx: 3, dy: -3 };
+let bricks = [];
+let levelClearing = false;
+
+/* ── 로컬스토리지 ── */
+function loadScores() {
+  try { return JSON.parse(localStorage.getItem('breakout_v2') || '[]'); }
+  catch(e) { return []; }
+}
+function saveScores(arr) {
+  try { localStorage.setItem('breakout_v2', JSON.stringify(arr)); } catch(e) {}
+}
+function addScore(name, sc, lv) {
+  const scores = loadScores();
+  const idx = scores.findIndex(s => s.name === name);
+  if (idx >= 0) {
+    if (sc > scores[idx].score) scores[idx] = { name, score: sc, level: lv };
+  } else {
+    scores.push({ name, score: sc, level: lv });
+  }
+  scores.sort((a, b) => b.score - a.score);
+  const top = scores.slice(0, 10);
+  saveScores(top);
+  const rank = top.findIndex(s => s.name === name) + 1;
+  return { scores: top, rank };
+}
+
+/* ── 벽돌 초기화 ── */
+function initBricks() {
+  bricks = [];
+  const rows = LEVEL_CONFIG[level].rows;
+  for (let r = 0; r < rows; r++) {
+    for (let c = 0; c < BRICK_COLS; c++) {
+      bricks.push({
+        x: BRICK_OFFSET_X + c * (BRICK_W + BRICK_PAD),
+        y: BRICK_OFFSET_Y + r * (BRICK_H + BRICK_PAD),
+        alive: true,
+        color: BRICK_COLORS[r % BRICK_COLORS.length],
+        pts: Math.max(10, (rows - r) * 10)
+      });
+    }
+  }
+}
+
+function resetBall() {
+  const spd = LEVEL_CONFIG[level].speed;
+  ball.x = W / 2;
+  ball.y = PADDLE_Y - BALL_R - 10;
+  const angle = (Math.random() * 50 + 65) * (Math.PI / 180);
+  ball.dx = spd * Math.cos(angle) * (Math.random() > 0.5 ? 1 : -1);
+  ball.dy = -spd * Math.abs(Math.sin(angle));
+}
+
+/* ── 그리기 ── */
+function drawPaddle() {
+  ctx.fillStyle = '#B5D4F4';
+  ctx.beginPath();
+  ctx.roundRect(paddleX, PADDLE_Y, PADDLE_W, PADDLE_H, 8);
+  ctx.fill();
+}
+function drawBall() {
+  ctx.fillStyle = '#f0f0f0';
+  ctx.beginPath();
+  ctx.arc(ball.x, ball.y, BALL_R, 0, Math.PI * 2);
+  ctx.fill();
+}
+function drawBricks() {
+  bricks.forEach(b => {
+    if (!b.alive) return;
+    ctx.fillStyle = b.color;
+    ctx.beginPath();
+    ctx.roundRect(b.x, b.y, BRICK_W, BRICK_H, 4);
+    ctx.fill();
+    ctx.fillStyle = 'rgba(255,255,255,0.6)';
+    ctx.font = 'bold 11px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(b.pts, b.x + BRICK_W/2, b.y + BRICK_H/2);
+  });
+}
+
+/* ── 업데이트 ── */
+function update() {
+  if (levelClearing) return;
+  ball.x += ball.dx;
+  ball.y += ball.dy;
+
+  if (ball.x - BALL_R < 0)  { ball.x = BALL_R;     ball.dx =  Math.abs(ball.dx); }
+  if (ball.x + BALL_R > W)  { ball.x = W - BALL_R; ball.dx = -Math.abs(ball.dx); }
+  if (ball.y - BALL_R < 0)  { ball.y = BALL_R;     ball.dy =  Math.abs(ball.dy); }
+
+  if (
+    ball.y + BALL_R > PADDLE_Y &&
+    ball.y + BALL_R < PADDLE_Y + PADDLE_H + Math.abs(ball.dy) + 2 &&
+    ball.x > paddleX - 6 && ball.x < paddleX + PADDLE_W + 6
+  ) {
+    ball.dy = -Math.abs(ball.dy);
+    const hit = (ball.x - (paddleX + PADDLE_W/2)) / (PADDLE_W/2);
+    ball.dx = hit * LEVEL_CONFIG[level].speed * 1.2;
+  }
+
+  if (ball.y - BALL_R > H) {
+    lives--;
+    updateLivesHUD();
+    if (lives <= 0) { endGame(false); return; }
+    resetBall();
+  }
+
+  for (let b of bricks) {
+    if (!b.alive) continue;
+    if (ball.x+BALL_R > b.x && ball.x-BALL_R < b.x+BRICK_W &&
+        ball.y+BALL_R > b.y && ball.y-BALL_R < b.y+BRICK_H) {
+      b.alive = false;
+      score += b.pts;
+      updateScoreHUD();
+      const oL = (ball.x+BALL_R)-b.x, oR = (b.x+BRICK_W)-(ball.x-BALL_R);
+      const oT = (ball.y+BALL_R)-b.y, oB = (b.y+BRICK_H)-(ball.y-BALL_R);
+      if (Math.min(oL,oR) < Math.min(oT,oB)) ball.dx = -ball.dx;
+      else ball.dy = -ball.dy;
+      break;
+    }
+  }
+
+  if (bricks.every(b => !b.alive)) {
+    const bonus = level * 100;
+    score += bonus;
+    updateScoreHUD();
+    levelClearing = true;
+    document.getElementById('loTitle').textContent =
+      level < 5 ? '🎉 레벨 ' + level + ' 클리어!' : '🏆 전 레벨 클리어!';
+    document.getElementById('loMsg').textContent = '레벨 보너스 +' + bonus + '점';
+    document.getElementById('levelUpOverlay').style.display = 'flex';
+    setTimeout(() => {
+      document.getElementById('levelUpOverlay').style.display = 'none';
+      if (level >= 5) { endGame(true); return; }
+      level++;
+      document.getElementById('hudLevel').textContent = '레벨 ' + level;
+      initBricks();
+      resetBall();
+      levelClearing = false;
+    }, 2200);
+  }
+}
+
+function render() {
+  ctx.clearRect(0, 0, W, H);
+  ctx.fillStyle = '#1a1a2e';
+  ctx.fillRect(0, 0, W, H);
+  drawBricks();
+  drawPaddle();
+  drawBall();
+}
+
+function loop() { update(); render(); animId = requestAnimationFrame(loop); }
+
+function updateLivesHUD() {
+  const icons = ['','❤️','❤️❤️','❤️❤️❤️'];
+  document.getElementById('hudLives').textContent = icons[Math.max(0,lives)] || '';
+}
+function updateScoreHUD() {
+  document.getElementById('hudScore').textContent = '점수: ' + score;
+}
+
+canvas.addEventListener('mousemove', e => {
+  const rect = canvas.getBoundingClientRect();
+  paddleX = Math.max(0, Math.min(W-PADDLE_W, (e.clientX-rect.left)*(W/rect.width)-PADDLE_W/2));
+});
+canvas.addEventListener('touchmove', e => {
+  e.preventDefault();
+  const rect = canvas.getBoundingClientRect();
+  paddleX = Math.max(0, Math.min(W-PADDLE_W, (e.touches[0].clientX-rect.left)*(W/rect.width)-PADDLE_W/2));
+}, { passive: false });
+
+function startGame() {
+  const n = document.getElementById('nameInput').value.trim();
+  if (!n) { alert('이름을 입력해주세요!'); return; }
+  playerName = n; score = 0; lives = 3; level = 1; levelClearing = false;
+  document.getElementById('hudName').textContent = playerName;
+  document.getElementById('hudLevel').textContent = '레벨 1';
+  updateScoreHUD(); updateLivesHUD();
+  initBricks(); resetBall();
+  paddleX = W/2 - PADDLE_W/2;
+  document.getElementById('nameScreen').style.display = 'none';
+  document.getElementById('resultScreen').style.display = 'none';
+  document.getElementById('levelUpOverlay').style.display = 'none';
+  document.getElementById('gameScreen').style.display = 'flex';
+  if (animId) cancelAnimationFrame(animId);
+  loop();
+}
+
+function endGame(won) {
+  cancelAnimationFrame(animId);
+  const { scores, rank } = addScore(playerName, score, level);
+  document.getElementById('gameScreen').style.display = 'none';
+  document.getElementById('resultScreen').style.display = 'flex';
+  document.getElementById('resultTitle').textContent =
+    won ? '🏆 전 레벨 클리어!' : (level > 1 ? '레벨 ' + level + ' 도전 중 종료' : '게임 종료!');
+  document.getElementById('resultMsg').textContent =
+    playerName + '님의 최종 점수: ' + score + '점\n도달 레벨: ' + level + '단계';
+  let rankText = '';
+  if      (rank===1) rankText='🥇 1위! 최고 기록이에요!';
+  else if (rank===2) rankText='🥈 2위! 훌륭해요!';
+  else if (rank===3) rankText='🥉 3위! 잘 하셨어요!';
+  else               rankText='현재 ' + rank + '위입니다!';
+  document.getElementById('rankMsg').textContent = rankText;
+  const tbody = document.getElementById('lbBody');
+  tbody.innerHTML = '';
+  scores.forEach((s, i) => {
+    const tr = document.createElement('tr');
+    if (s.name === playerName && s.score === score) tr.className = 'highlight-row';
+    const medal = ['🥇','🥈','🥉'][i] || (i+1)+'위';
+    tr.innerHTML = '<td>'+medal+'</td><td>'+s.name+'</td><td>'+s.score+'점</td><td>Lv.'+s.level+'</td>';
+    tbody.appendChild(tr);
+  });
+}
+
+function resetToName() {
+  cancelAnimationFrame(animId);
+  document.getElementById('resultScreen').style.display = 'none';
+  document.getElementById('gameScreen').style.display = 'none';
+  document.getElementById('nameScreen').style.display = 'flex';
+  document.getElementById('nameInput').value = '';
+}
+
+document.getElementById('nameInput').addEventListener('keydown', e => {
+  if (e.key==='Enter') startGame();
+});
+</script>
+</body>
+</html>
